@@ -13,6 +13,29 @@ jobs:
   ci:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: odonto_user
+          POSTGRES_PASSWORD: odonto_dev
+          POSTGRES_DB: odonto
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U odonto_user -d odonto"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: odonto
+      DB_USERNAME: odonto_user
+      DB_PASSWORD: odonto_dev
+
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
