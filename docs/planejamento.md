@@ -8,10 +8,10 @@ Sistema fechado para uma clínica odontológica: dentistas e o dono cadastram pa
 
 ## 2. Perfis de acesso
 
-| Perfil | Quem é | Acesso |
-|---|---|---|
-| `admin` | Dono da clínica | Tudo. Também pode atender como dentista (ver seção 9). |
-| `dentista` | Profissional que atende | Apenas os **seus** pacientes e as **suas** consultas. |
+| Perfil     | Quem é                  | Acesso                                                 |
+| ---------- | ----------------------- | ------------------------------------------------------ |
+| `admin`    | Dono da clínica         | Tudo. Também pode atender como dentista (ver seção 9). |
+| `dentista` | Profissional que atende | Apenas os **seus** pacientes e as **suas** consultas.  |
 
 - Não existe cadastro público. O `admin` cria as contas dos dentistas.
 - Um paciente pertence a **um único dentista** (o responsável).
@@ -22,30 +22,30 @@ Sistema fechado para uma clínica odontológica: dentistas e o dono cadastram pa
 
 Acrescentar:
 
-| Campo | Obrigatório | Observação |
-|---|---|---|
-| `perfil` | sim | `admin` ou `dentista` |
+| Campo    | Obrigatório | Observação            |
+| -------- | ----------- | --------------------- |
+| `perfil` | sim         | `admin` ou `dentista` |
 
 ### `pacientes`
 
-| Campo | Obrigatório | Observação |
-|---|---|---|
-| nome | sim | Campo separado do sobrenome |
-| sobrenome | sim | |
-| data de nascimento | sim | A idade é **calculada**, nunca guardada |
-| bairro | sim | Região onde mora (sem rua e número, por minimização de dados) |
-| telefone | sim | Também serve para confirmar a identidade do paciente |
-| `dentista_id` | sim | Dentista responsável (aponta para `users`) |
+| Campo              | Obrigatório | Observação                                                    |
+| ------------------ | ----------- | ------------------------------------------------------------- |
+| nome               | sim         | Campo separado do sobrenome                                   |
+| sobrenome          | sim         |                                                               |
+| data de nascimento | sim         | A idade é **calculada**, nunca guardada                       |
+| bairro             | sim         | Região onde mora (sem rua e número, por minimização de dados) |
+| telefone           | sim         | Também serve para confirmar a identidade do paciente          |
+| `dentista_id`      | sim         | Dentista responsável (aponta para `users`)                    |
 
 Um paciente só existe depois de ter ido à clínica e marcado uma consulta. Quem só ligou para tirar dúvida não é cadastrado.
 
 ### `procedimentos`
 
-| Campo | Obrigatório | Observação |
-|---|---|---|
-| nome | sim | Único |
-| `status` | sim | `pendente`, `aprovado` ou `recusado` |
-| `solicitado_por` | não | Dentista que pediu. Vazio nos procedimentos iniciais |
+| Campo            | Obrigatório | Observação                                           |
+| ---------------- | ----------- | ---------------------------------------------------- |
+| nome             | sim         | Único                                                |
+| `status`         | sim         | `pendente`, `aprovado` ou `recusado`                 |
+| `solicitado_por` | não         | Dentista que pediu. Vazio nos procedimentos iniciais |
 
 Procedimentos iniciais (seeder, já aprovados): **Limpeza** e **Restauração**.
 
@@ -53,20 +53,20 @@ Fluxo: o dentista solicita um procedimento novo (`pendente`), e o `admin` aprova
 
 ### `consultas`
 
-| Campo | Obrigatório | Observação |
-|---|---|---|
-| `paciente_id` | sim | |
-| `dentista_id` | sim | Quem atendeu. Fica na consulta para manter o histórico caso o paciente troque de dentista |
-| início | sim | Data e hora. O término é **calculado** (início + 1h30), não guardado |
-| `status` | sim | `agendada`, `confirmada`, `realizada`, `cancelada` ou `faltou` |
-| observações | não | Texto livre |
+| Campo         | Obrigatório | Observação                                                                                |
+| ------------- | ----------- | ----------------------------------------------------------------------------------------- |
+| `paciente_id` | sim         |                                                                                           |
+| `dentista_id` | sim         | Quem atendeu. Fica na consulta para manter o histórico caso o paciente troque de dentista |
+| início        | sim         | Data e hora. O término é **calculado** (início + 1h30), não guardado                      |
+| `status`      | sim         | `agendada`, `confirmada`, `realizada`, `cancelada` ou `faltou`                            |
+| observações   | não         | Texto livre                                                                               |
 
 ### `consulta_procedimento` (tabela de ligação)
 
-| Campo | Obrigatório | Observação |
-|---|---|---|
-| `consulta_id` | sim | |
-| `procedimento_id` | sim | |
+| Campo             | Obrigatório | Observação |
+| ----------------- | ----------- | ---------- |
+| `consulta_id`     | sim         |            |
+| `procedimento_id` | sim         |            |
 
 Uma consulta pode ter vários procedimentos, e um procedimento aparece em várias consultas.
 
@@ -88,15 +88,15 @@ Uma consulta pode ter vários procedimentos, e um procedimento aparece em vária
 
 ## 6. Quem pode o quê (viram Policies)
 
-| Ação | `admin` | `dentista` |
-|---|---|---|
-| Ver, cadastrar e editar pacientes | todos | só os seus |
-| Ver, agendar e editar consultas | todas | só as suas |
-| Mudar status da consulta | todas | só das suas |
-| Ver procedimentos | todos | só os aprovados |
-| Solicitar procedimento | sim | sim |
-| Aprovar ou recusar procedimento | sim | não |
-| Criar e gerenciar usuários | sim | não |
+| Ação                              | `admin` | `dentista`      |
+| --------------------------------- | ------- | --------------- |
+| Ver, cadastrar e editar pacientes | todos   | só os seus      |
+| Ver, agendar e editar consultas   | todas   | só as suas      |
+| Mudar status da consulta          | todas   | só das suas     |
+| Ver procedimentos                 | todos   | só os aprovados |
+| Solicitar procedimento            | sim     | sim             |
+| Aprovar ou recusar procedimento   | sim     | não             |
+| Criar e gerenciar usuários        | sim     | não             |
 
 ## 7. Telas
 
@@ -110,10 +110,10 @@ Uma consulta pode ter vários procedimentos, e um procedimento aparece em vária
 ## 8. Decisões pendentes
 
 1. **Como garantir que duas consultas não se sobreponham.** Com duração fixa de 1h30, um índice único em (`dentista_id`, início) só impede o **mesmo horário de início**, e não impede 10h00 e 10h30. Caminhos possíveis:
-   - Validar a sobreposição no Form Request e manter o índice único parcial como segunda barreira.
-   - Limitar os horários de início a uma grade fixa (por exemplo, a cada 1h30), o que faz o índice único bastar.
-   - Usar uma restrição de exclusão do PostgreSQL com intervalo de tempo (mais avançado).
-   Decidir ao chegar na migration de `consultas`.
+    - Validar a sobreposição no Form Request e manter o índice único parcial como segunda barreira.
+    - Limitar os horários de início a uma grade fixa (por exemplo, a cada 1h30), o que faz o índice único bastar.
+    - Usar uma restrição de exclusão do PostgreSQL com intervalo de tempo (mais avançado).
+      Decidir ao chegar na migration de `consultas`.
 
 ## 9. Fora do escopo por enquanto
 
@@ -126,6 +126,7 @@ Uma consulta pode ter vários procedimentos, e um procedimento aparece em vária
 Seguindo o `CLAUDE.md`: migrations → models → policies → form requests → controllers → rotas → páginas React → testes.
 
 Migrations, na ordem das dependências:
+
 1. Campo `perfil` em `users`
 2. `pacientes`
 3. `procedimentos`
