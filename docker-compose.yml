@@ -1,0 +1,15 @@
+services:
+    postgres:
+        image: postgres:18
+        container_name: odonto-postgres
+        restart: unless-stopped
+        ports:
+            - '5432:5432'
+        environment:
+            POSTGRES_USER: odonto_user
+            POSTGRES_PASSWORD: odonto_dev
+            POSTGRES_DB: odonto
+        volumes:
+            - postgres_data:/var/lib/postgresql
+volumes:
+    postgres_data:
