@@ -41,15 +41,37 @@ Um paciente só existe depois de ter ido à clínica e marcado uma consulta. Que
 
 ### `procedimentos`
 
-| Campo            | Obrigatório | Observação                                           |
-| ---------------- | ----------- | ---------------------------------------------------- |
-| nome             | sim         | Único                                                |
-| `status`         | sim         | `pendente`, `aprovado` ou `recusado`                 |
-| `solicitado_por` | não         | Dentista que pediu. Vazio nos procedimentos iniciais |
+Catálogo dos procedimentos que a clínica realiza. Contém **apenas procedimentos já aprovados**.
 
-Procedimentos iniciais (seeder, já aprovados): **Limpeza** e **Restauração**.
+| Campo | Obrigatório | Observação |
+| ----- | ----------- | ---------- |
+| nome  | sim         | Único      |
 
-Fluxo: o dentista solicita um procedimento novo (`pendente`), e o `admin` aprova ou recusa. Só os `aprovados` aparecem para escolha numa consulta.
+Procedimentos iniciais (seeder): **Limpeza** e **Restauração**.
+
+Quem pediu um procedimento e quando ele foi decidido fica registrado em `solicitacoes_procedimentos`, e não nesta tabela. Assim a informação existe em um lugar só.
+
+### `solicitacoes_procedimentos`
+
+Pedidos de novos procedimentos feitos pelos dentistas. Guarda o histórico completo, inclusive os recusados.
+
+| Campo             | Obrigatório | Observação                                                                  |
+| ----------------- | ----------- | --------------------------------------------------------------------------- |
+| nome              | sim         | Nome sugerido para o procedimento                                           |
+| `solicitado_por`  | sim         | Dentista que pediu (aponta para `users`)                                    |
+| `status`          | sim         | `pendente` (padrão), `aprovada` ou `recusada`                               |
+| `decidido_por`    | não         | `admin` que decidiu (aponta para `users`). Vazio enquanto pendente          |
+| `decidido_em`     | não         | Data e hora da decisão. Vazio enquanto pendente                             |
+| motivo            | não         | Justificativa do `admin`. Obrigatória ao recusar (validada no Form Request) |
+| `procedimento_id` | não         | Preenchido ao aprovar, aponta para o procedimento criado em `procedimentos` |
+
+Fluxo:
+
+1. O dentista cria uma solicitação (`pendente`).
+2. O `admin` vê a fila de pendentes e decide.
+3. **Aprovar:** cria a linha em `procedimentos`, e a solicitação vira `aprovada` com `procedimento_id` preenchido. As duas escritas acontecem juntas, em uma transação.
+4. **Recusar:** a solicitação vira `recusada`, com o motivo. Nada entra em `procedimentos`.
+5. Uma solicitação decidida não muda mais. Se o dentista quiser insistir, faz uma nova.
 
 ### `consultas`
 
@@ -76,7 +98,9 @@ Uma consulta pode ter vários procedimentos, e um procedimento aparece em vária
 - Um paciente tem **muitas** consultas (1:N).
 - Um dentista tem **muitas** consultas (1:N).
 - Consultas e procedimentos: **muitos para muitos**, por meio de `consulta_procedimento`.
-- Um dentista pode **solicitar** vários procedimentos (1:N, campo `solicitado_por`).
+- Um dentista (`users`) pode **solicitar** vários procedimentos (1:N, campo `solicitado_por` em `solicitacoes_procedimentos`).
+- Um `admin` (`users`) pode **decidir** várias solicitações (1:N, campo `decidido_por`).
+- Uma solicitação aprovada aponta para **um** procedimento (`procedimento_id`), e um procedimento tem no máximo **uma** solicitação de origem. Os procedimentos iniciais não têm solicitação.
 
 ## 5. Regras de negócio
 
@@ -85,18 +109,21 @@ Uma consulta pode ter vários procedimentos, e um procedimento aparece em vária
 3. **Cancelada libera o horário:** consultas com status `cancelada` não contam para o conflito. Será implementado com um **índice único parcial** no PostgreSQL (ver seção 8, decisão pendente sobre sobreposição).
 4. **Idade calculada:** a idade vem da data de nascimento.
 5. **Dados mínimos (LGPD):** não se guardam CPF nem e-mail do paciente. A confirmação de identidade é feita por nome e telefone, e o contato é feito por WhatsApp fora do sistema.
+6. **Procedimento não se repete:** o nome de uma solicitação não pode coincidir com um procedimento já existente, sem diferenciar maiúsculas de minúsculas (validado no Form Request). Uma solicitação **recusada** não impede um novo pedido com o mesmo nome.
+7. **Decisão é do `admin`:** só o `admin` aprova ou recusa. Dentista nenhum decide, nem a própria solicitação.
 
 ## 6. Quem pode o quê (viram Policies)
 
-| Ação                              | `admin` | `dentista`      |
-| --------------------------------- | ------- | --------------- |
-| Ver, cadastrar e editar pacientes | todos   | só os seus      |
-| Ver, agendar e editar consultas   | todas   | só as suas      |
-| Mudar status da consulta          | todas   | só das suas     |
-| Ver procedimentos                 | todos   | só os aprovados |
-| Solicitar procedimento            | sim     | sim             |
-| Aprovar ou recusar procedimento   | sim     | não             |
-| Criar e gerenciar usuários        | sim     | não             |
+| Ação                              | `admin` | `dentista`  |
+| --------------------------------- | ------- | ----------- |
+| Ver, cadastrar e editar pacientes | todos   | só os seus  |
+| Ver, agendar e editar consultas   | todas   | só as suas  |
+| Mudar status da consulta          | todas   | só das suas |
+| Ver procedimentos                 | todos   | todos       |
+| Ver solicitações de procedimento  | todas   | só as suas  |
+| Solicitar procedimento            | sim     | sim         |
+| Aprovar ou recusar solicitação    | sim     | não         |
+| Criar e gerenciar usuários        | sim     | não         |
 
 ## 7. Telas
 
@@ -104,7 +131,8 @@ Uma consulta pode ter vários procedimentos, e um procedimento aparece em vária
 - Dashboard: agenda do dia para o dentista, painel geral para o `admin`.
 - Pacientes: listar (com paginação), cadastrar, editar.
 - Consultas: listar, agendar, mudar status.
-- Procedimentos: listar e solicitar. Fila de aprovação só para o `admin`.
+- Procedimentos: listar o catálogo.
+- Solicitações de procedimento: o dentista cria e acompanha as suas (com o status e o motivo da recusa). O `admin` vê a fila de pendentes, aprova ou recusa, e consulta o histórico.
 - Usuários: só para o `admin`.
 
 ## 8. Decisões pendentes
@@ -115,11 +143,15 @@ Uma consulta pode ter vários procedimentos, e um procedimento aparece em vária
     - Usar uma restrição de exclusão do PostgreSQL com intervalo de tempo (mais avançado).
       Decidir ao chegar na migration de `consultas`.
 
+2. **Regras de exclusão nas chaves de `solicitacoes_procedimentos`.** `solicitado_por` e `decidido_por` apontam para `users`. Para preservar o histórico, a ideia é `restrictOnDelete()` (não se apaga um usuário que tem solicitações) ou `nullOnDelete()` (o histórico fica, sem o nome). `procedimento_id` tende a `nullOnDelete()`. Decidir ao chegar na migration.
+3. **Nome único no catálogo sem diferenciar maiúsculas.** O `unique()` do PostgreSQL diferencia `Limpeza` de `limpeza`. Começar validando no Form Request, e avaliar um índice único sobre `lower(nome)` como segunda barreira.
+
 ## 9. Fora do escopo por enquanto
 
 - Botão para o `admin` alternar entre o painel administrativo e a visão de dentista. Será um acabamento de interface no fim, sem mudança no banco.
 - Preço e duração variável de procedimentos.
 - CPF, e-mail e endereço completo do paciente.
+- Notificações automáticas (e-mail ou push) sobre solicitações. No início, o `admin` vê a fila de pendentes no painel.
 
 ## 10. Ordem de implementação
 
@@ -130,5 +162,6 @@ Migrations, na ordem das dependências:
 1. Campo `perfil` em `users`
 2. `pacientes`
 3. `procedimentos`
-4. `consultas`
-5. `consulta_procedimento`
+4. `solicitacoes_procedimentos`
+5. `consultas`
+6. `consulta_procedimento`
